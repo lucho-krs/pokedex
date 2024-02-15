@@ -19,11 +19,7 @@ export class PokemonService {
       const pokemon = await this.pokemonModel.create( createPokemonDto );
       return pokemon;
     } catch ( err ) {
-      if ( err.code === 11000 ) {
-        throw new BadRequestException(`Pokemon exists in db ${ JSON.stringify( err.keyValue )}`)
-      }
-
-      throw new InternalServerErrorException(`Can't create Pokemon - Check server log`);
+      this.handleExceptions( err );
     }
 
   }
@@ -33,7 +29,7 @@ export class PokemonService {
     return pokemons;
   }
 
-  async findOne(term: string) {
+  async findOne( term: string ) {
     let pokemon: Pokemon;
 
     if ( !isNaN( +term )) {
@@ -58,24 +54,31 @@ export class PokemonService {
     term: string, 
     updatePokemonDto: UpdatePokemonDto
   ) {
-    const pokemon = await this.findOne( term );
-    if ( updatePokemonDto.name ) {
-      updatePokemonDto.name = updatePokemonDto.name.toLocaleLowerCase();
-    }
+    try {
+      const pokemon = await this.findOne( term );
+      if ( updatePokemonDto.name ) {
+        updatePokemonDto.name = updatePokemonDto.name.toLocaleLowerCase();
+      }
 
-    await pokemon.updateOne( updatePokemonDto );
-    return {
-      ...pokemon.toJSON(), ...updatePokemonDto
-    };
+      await pokemon.updateOne( updatePokemonDto );
+      return {
+        ...pokemon.toJSON(), ...updatePokemonDto
+      };
+    } catch (err) {
+      this.handleExceptions( err );
+    }
   }
 
-  async remove(id: string) {
-    let pokemon: Pokemon;
+  async remove( id: string ) {
+    const result = await this.pokemonModel.findByIdAndDelete( id );
+    return result
+  }
 
-    if ( !isValidObjectId( id ) ) {
-      pokemon = await this.pokemonModel.findByIdAndDelete( id );
+  private handleExceptions( error: any ) {
+    if ( error.code === 11000 ) {
+      throw new BadRequestException(`Pokemon exists in db ${ JSON.stringify( error.keyValue )}`)
     }
 
-    return `This action removes a #${pokemon}`;
+    throw new InternalServerErrorException(`Can't create Pokemon - Check server log`);
   }
 }
